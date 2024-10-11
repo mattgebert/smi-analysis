@@ -31,6 +31,12 @@ with open(path.join(here, 'requirements.txt')) as requirements_file:
     # Parse requirements.txt, ignoring any commented-out lines.
     requirements = [line for line in requirements_file.read().splitlines()
                     if not line.startswith('#')]
+    
+with open(path.join(here, 'requirements-analysis.txt')) as requirements_file:
+    # Parse requirements.txt, ignoring any commented-out lines.
+    requirements += [line for line in requirements_file.read().splitlines()
+                    if not line.startswith('#')]
+
 
 # Git-based installations aren't valid in install_requires.
 # Remove them from the list.

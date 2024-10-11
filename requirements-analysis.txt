@@ -1,0 +1,6 @@
+# These are required/useful for running the analysis scripts
+emcee # For MCMC fitting
+corner # For plotting MCMC results
+ipympl # For interactive plotting using the %matplotlib widget magic.
+pyOpenCL # For GPU acceleration for SILX/PyFAI
+tqdm # For progress bars when performing emcee sampling.
