@@ -298,6 +298,8 @@ class SMI_geometry():
 
     def radial_averaging(self, radial_range=None, azimuth_range=None, npt=2000):
         self.q_rad, self.I_rad = [], []
+        # Also do error propogation
+        self.q_rad_err, self.I_rad_err = [], []
 
         if self.geometry == 'Transmission':
             if np.array_equal(self.inpaints, []):
@@ -312,7 +314,7 @@ class SMI_geometry():
             if azimuth_range is None and self.detector == 'Pilatus1m':
                 azimuth_range = (-180, 180)
 
-            self.q_rad, self.I_rad = integrate1D.integrate_rad_saxs(self.inpaints,
+            self.q_rad, self.I_rad, self.I_rad_err = integrate1D.integrate_rad_saxs(self.inpaints,
                                                                     self.ai,
                                                                     self.masks,
                                                                     radial_range=radial_range,
@@ -333,7 +335,7 @@ class SMI_geometry():
             if azimuth_range is None and self.detector == 'rayonix':
                 azimuth_range = (0, self.qz[1])
 
-            self.q_rad, self.I_rad = integrate1D.integrate_rad_gisaxs(self.img_st,
+            self.q_rad, self.I_rad, self.I_rad_err = integrate1D.integrate_rad_gisaxs(self.img_st,
                                                                       self.qp,
                                                                       self.qz,
                                                                       bins=npt,

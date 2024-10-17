@@ -1,7 +1,7 @@
 import numpy as np
 from pyFAI.multi_geometry import MultiGeometry
 from pyFAI.ext import splitBBox
-
+from pyFAI.containers import ErrorModel
 
 def inpaint_saxs(imgs, ais, masks, **kwargs):
     """
@@ -63,7 +63,7 @@ def cake_saxs(inpaints, ais, masks, radial_range=(0, 60), azimuth_range=(-90, 90
     return cake, q, chi[::-1]
 
 
-def integrate_rad_saxs(inpaints, ais, masks, radial_range=(0, 40), azimuth_range=(0, 90), npt=2000):
+def integrate_rad_saxs(inpaints, ais, masks, radial_range=(0, 40), azimuth_range=(0, 90), npt=2000, error_model='poisson'):
     """
     Radial integration of transmission data using the pyFAI multigeometry module
 
@@ -91,12 +91,13 @@ def integrate_rad_saxs(inpaints, ais, masks, radial_range=(0, 40), azimuth_range
                        empty=-1,
                        chi_disc=180)
 
-    q, i_rad = mg.integrate1d(lst_data=inpaints,
+    q, i_rad, i_rad_err = mg.integrate1d(lst_data=inpaints,
                               npt=npt,
                               correctSolidAngle=True,
-                              lst_mask=masks)
+                              lst_mask=masks,
+                              error_model=error_model)
 
-    return q, i_rad
+    return q, i_rad, i_rad_err
 
 
 def integrate_azi_saxs(cake, q_array, chi_array, radial_range=(0, 10), azimuth_range=(-90, 0)):
@@ -130,7 +131,7 @@ def integrate_azi_saxs(cake, q_array, chi_array, radial_range=(0, 10), azimuth_r
     return chi_array, i_azi
 
 
-def integrate_rad_gisaxs(img, q_par, q_per, bins=1000, radial_range=None, azimuth_range=None):
+def integrate_rad_gisaxs(img, q_par, q_per, bins=1000, radial_range=None, azimuth_range=None, error_model=ErrorModel.POISSON):
     """
     Radial integration of Grazing incidence data using the pyFAI multigeometry module
 
@@ -171,7 +172,22 @@ def integrate_rad_gisaxs(img, q_par, q_per, bins=1000, radial_range=None, azimut
     img_mask = np.ma.masked_where(chi_array < np.min(azimuth_range), img_mask)
     img_mask = np.ma.masked_where(chi_array > np.max(azimuth_range), img_mask)
 
-    q_rad, i_rad, _, _ = splitBBox.histoBBox1d(img_mask,
+    
+    # q_rad, i_rad, _, _ = splitBBox.histoBBox1d(img_mask,
+                                            #    pos0=tth_array,
+                                            #    delta_pos0=np.ones_like(img_mask) * (q_par[1] - q_par[0])/np.shape(
+                                            #        img_mask)[1],
+                                            #    pos1=q_v_te,
+                                            #    delta_pos1=np.ones_like(img_mask) * (q_per[1] - q_per[0])/np.shape(
+                                            #        img_mask)[0],
+                                            #    bins=bins,
+                                            #    pos0_range=np.array([np.min(tth_array), np.max(tth_array)]),
+                                            #    pos1_range=q_per,
+                                            #    dummy=None,
+                                            #    delta_dummy=None,
+                                            #    mask=img_mask.mask
+                                            #    )
+    Int1dtpl_res = splitBBox.histoBBox1d_engine(img_mask,
                                                pos0=tth_array,
                                                delta_pos0=np.ones_like(img_mask) * (q_par[1] - q_par[0])/np.shape(
                                                    img_mask)[1],
@@ -183,9 +199,10 @@ def integrate_rad_gisaxs(img, q_par, q_per, bins=1000, radial_range=None, azimut
                                                pos1_range=q_per,
                                                dummy=None,
                                                delta_dummy=None,
-                                               mask=img_mask.mask
-                                               )
-    return q_rad, i_rad
+                                               mask=img_mask.mask,
+                                               error_model=error_model)
+    q_rad, i_rad, i_rad_err = Int1dtpl_res.position, Int1dtpl_res.intensity, Int1dtpl_res.sigma
+    return q_rad, i_rad, i_rad_err
 
 
 def integrate_qpar(img, q_par, q_per, q_par_range=None, q_per_range=None):
