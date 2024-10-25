@@ -89,6 +89,7 @@ class SMI_geometry():
             self.define_detector()
 
         self.imgs = []
+        self.masks = []
         if len(lst_img) != len(self.bs):
             self.bs = self.bs + [[0, 0]]*(len(lst_img) - len(self.bs))
 
