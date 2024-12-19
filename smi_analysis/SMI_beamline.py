@@ -7,31 +7,65 @@ import fabio
 import numpy as np
 import copy
 import datetime
-
+from typing import Literal
+import numpy.typing as npt
 
 class SMI_geometry():
+    """
+    The SMI_geometry class is a class that contains all the information about the geometry of the beamline.
+    
+    Used for calculating and stiching images together from various detector positions/angles.
+    
+    Parameters
+    ----------
+    geometry : Literal['Transmission'] | Literal['Reflection']
+        The measurement geometry.
+    sdd : float
+        Sample to detector distance in millimeters.
+    wav : float
+        The wavelength of the X-ray beam in meters.
+    center : tuple[int|float, int|float]
+        Coordinates of the beam centre at 0 degrees.
+    bs_pos : list[tuple[int, int]]
+        The position of the center of the beam stop for each detector angle; [0,0] implies not measured.
+    detector : Literal['Pilatus900kw'] | Literal['Pilatus1m']
+        Type of detector.
+    det_ini_angle : float
+        The initial angle of the detector.
+    det_angle_step : float
+        The step between each detector angle.
+    det_angles : list[int | float] | npt.NDArray[np.float64 | np.int_]
+        The angles of the detector in radians.
+    alphai : float
+        The angle of incidence of the X-ray beam in degrees.
+    bs_kind : Literal["pindiode"] | Literal['rod'] | None
+        The type of beamstop used for the measurement.
+    """
+    
     def __init__(self,
-                 geometry,
-                 sdd,
-                 wav,
-                 center,
-                 bs_pos,
-                 detector,
-                 det_ini_angle=0,
-                 det_angle_step=0,
-                 det_angles=[],
+                 geometry: Literal['Transmission'] | Literal['Reflection'],
+                 sdd: float,
+                 wav: float,
+                 center: tuple[int|float, int|float],
+                 bs_pos: list[tuple[int, int]],
+                 detector: Literal['Pilatus900kw'] | Literal['Pilatus1m'] = 'Pilatus900kw',
+                 det_ini_angle: float=0,
+                 det_angle_step: float=0,
+                 det_angles: list[int | float] | npt.NDArray[np.float64 | np.int_]=[],
                  alphai=0,
                  bs_kind=None):
 
-        self.geometry = geometry
-        self.sdd = sdd
-        self._wav = wav
-        self.geometry = geometry
-        self._alphai = np.rad2deg(-alphai)
-        self.center = center
-        self.bs = bs_pos
-        self.geometry = geometry
-        self.detector = detector
+        self.geometry: Literal['Transmission'] | Literal['Reflection'] = geometry
+        """The measurement geometry."""
+        self.sdd: float = sdd
+        """Sample to detector distance in millimeters."""
+        self._wav: float = wav
+        """The wavelength of the X-ray beam in meters."""
+        self._alphai: float = -alphai
+        """The angle of incidence of the X-ray beam in degrees."""
+        self.center: tuple[int|float, int|float] = center
+        self.bs: list[tuple[int, int]] = bs_pos
+        self.detector: Literal['Pilatus900kw'] | Literal['Pilatus1m'] = detector
 
         self.det_ini_angle = det_ini_angle
         self.det_angle_step = det_angle_step
