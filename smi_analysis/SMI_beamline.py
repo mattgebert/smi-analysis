@@ -6,6 +6,7 @@ import os
 import fabio
 import numpy as np
 import copy
+import datetime
 
 
 class SMI_geometry():
@@ -24,9 +25,9 @@ class SMI_geometry():
 
         self.geometry = geometry
         self.sdd = sdd
-        self.wav = wav
+        self._wav = wav
         self.geometry = geometry
-        self.alphai = np.rad2deg(-alphai)
+        self._alphai = np.rad2deg(-alphai)
         self.center = center
         self.bs = bs_pos
         self.geometry = geometry
@@ -36,7 +37,8 @@ class SMI_geometry():
         self.det_angle_step = det_angle_step
         self.det_angles = det_angles
 
-        self.ai = []
+        self.ai: list[azimuthalIntegrator.AzimuthalIntegrator | Transform] = []
+        """Azimuthal integrator objects for each detector angle"""
         self.masks = []
         self.cake = []
         self.inpaints, self.mask_inpaints = [], []
@@ -54,6 +56,39 @@ class SMI_geometry():
         self.q_hor, self.I_hor = [], []
         self.q_ver, self.I_ver = [], []
         self.q_rad, self.I_rad = [], []
+        
+    @property
+    def wav(self):
+        return self._wav
+    
+    @wav.setter
+    def wav(self, value):
+        self._wav = value
+        
+        ## THIS WAS TOO SLOW. I COMMENTED IT OUT.
+        # # Reset the azimuthal integrators, which depend on the wavelength
+        # self.ai = []
+        
+        # INSTEAD, UPDATE THE AI OBJECT PROPERTIES
+        for ai in self.ai:
+            ai.set_wavelength(value) # From pyFai.geometry.core.Geometry
+            
+    @property
+    def alphai(self):
+        return self._alphai
+    
+    @alphai.setter
+    def alphai(self, value):        
+        self._alphai = np.rad2deg(-value)
+        
+        ## THIS WAS TOO SLOW. I COMMENTED IT OUT.
+        # # Reset the azimuthal integrators, which depend on the incident angle
+        # self.ai = []
+        
+        # INSTEAD, UPDATE THE AI OBJECT PROPERTIES
+        for ai in self.ai:
+            if self.geometry == 'Reflection' and isinstance(ai, Transform):
+                ai.set_incident_angle(self._alphai)
 
     def define_detector(self):
         """
@@ -202,9 +237,10 @@ class SMI_geometry():
             ai_temp.set_rot1(det_rot)
             self.ai.append(ai_temp)
 
-    def stitching_data(self, flag_scale=True, interp_factor=1):
+    def stitching_data(self, flag_scale=True, interp_factor=1, timing = False):
         self.img_st, self.qp, self.qz = [], [], []
 
+        init = datetime.datetime.now()
         if self.ai == []:
             if len(self.det_angles) != len(self.imgs):
                 if self.detector != 'Pilatus900kw':
@@ -233,6 +269,7 @@ class SMI_geometry():
                         angles = angles + [angle - np.deg2rad(7.47), angle, angle + np.deg2rad(7.47)]
                     self.det_angles = angles
 
+            # Calculate the self.ai values.
             if self.geometry == 'Transmission':
                 self.calculate_integrator_trans(self.det_angles)
             elif self.geometry == 'Reflection':
@@ -241,7 +278,11 @@ class SMI_geometry():
                 self.calculate_integrator_gi2(self.det_angles)
             else:
                 raise Exception('Unknown geometry: should be either Transmission or Reflection')
+        fin = datetime.datetime.now()
+        if timing:
+            print('Time to calculate the integrator: %s' % (fin - init))
 
+        init = datetime.datetime.now()
         self.img_st, self.mask_st, self.qp, self.qz, self.scales = stitch.stitching(self.imgs,
                                                                                     self.ai,
                                                                                     self.masks,
@@ -249,6 +290,9 @@ class SMI_geometry():
                                                                                     flag_scale=flag_scale,
                                                                                     interp_factor=interp_factor
                                                                                     )
+        fin = datetime.datetime.now()
+        if timing:
+            print('Time to stitch the images: %s' % (fin - init))
 
         if len(self.scales) == 1 or not flag_scale:
             pass
