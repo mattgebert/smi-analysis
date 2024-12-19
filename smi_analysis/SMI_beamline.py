@@ -107,15 +107,16 @@ class SMI_geometry():
     
     @wav.setter
     def wav(self, value):
-        self._wav = value
-        
-        ## THIS WAS TOO SLOW. I COMMENTED IT OUT.
-        # # Reset the azimuthal integrators, which depend on the wavelength
-        # self.ai = []
-        
-        # INSTEAD, UPDATE THE AI OBJECT PROPERTIES
-        for ai in self.ai:
-            ai.set_wavelength(value) # From pyFai.geometry.core.Geometry
+        if self._wav != value:
+            self._wav = value
+            
+            ## THIS WAS TOO SLOW. I COMMENTED IT OUT.
+            # # Reset the azimuthal integrators, which depend on the wavelength
+            # self.ai = []
+            
+            # INSTEAD, UPDATE THE AI OBJECT PROPERTIES
+            for ai in self.ai:
+                ai.set_wavelength(value) # From pyFai.geometry.core.Geometry
             
     @property
     def alphai(self):
@@ -136,17 +137,19 @@ class SMI_geometry():
         return self._alphai
     
     @alphai.setter
-    def alphai(self, value):        
-        self._alphai = - value
-        
-        ## THIS WAS TOO SLOW. I COMMENTED IT OUT.
-        # # Reset the azimuthal integrators, which depend on the incident angle
-        # self.ai = []
-        
-        # INSTEAD, UPDATE THE AI OBJECT PROPERTIES
-        for ai in self.ai:
-            if self.geometry == 'Reflection' and isinstance(ai, Transform):
-                ai.set_incident_angle(self._alphai)
+    def alphai(self, value):
+        v = -value
+        if self._alphai != v:
+            self._alphai = v
+            
+            ## THIS WAS TOO SLOW. I COMMENTED IT OUT.
+            # # Reset the azimuthal integrators, which depend on the incident angle
+            # self.ai = []
+            
+            # INSTEAD, UPDATE THE AI OBJECT PROPERTIES
+            for ai in self.ai:
+                if self.geometry == 'Reflection' and isinstance(ai, Transform):
+                    ai.set_incident_angle(self._alphai)
 
     def define_detector(self):
         """
