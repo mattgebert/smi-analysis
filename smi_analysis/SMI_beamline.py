@@ -59,6 +59,16 @@ class SMI_geometry():
         
     @property
     def wav(self):
+        """
+        Wavelength of the X-ray beam in meters.
+        
+        Setting propogates the wavelength change to the azimuthal integrators.
+        
+        Parameters
+        ----------
+        value : float
+            Wavelength of the X-ray beam in meters.
+        """
         return self._wav
     
     @wav.setter
@@ -75,11 +85,25 @@ class SMI_geometry():
             
     @property
     def alphai(self):
+        """
+        Angle of incidence of the X-ray beam in degrees.
+        
+        Setting propogates the incident angle change to the azimuthal integrators.
+        Note that when setting alphai, SMI_geometry changes the sign of the angle,
+        to match the constructor convention (which also converts from radians to degress).
+        As this value will be used internally, we keep the value in degress, and make the setter
+        also degrees rather than radians like the constructor.
+        
+        Parameters
+        ----------
+        value : float
+            Angle of incidence of the X-ray beam in degrees.
+        """
         return self._alphai
     
     @alphai.setter
     def alphai(self, value):        
-        self._alphai = np.rad2deg(-value)
+        self._alphai = - value
         
         ## THIS WAS TOO SLOW. I COMMENTED IT OUT.
         # # Reset the azimuthal integrators, which depend on the incident angle
