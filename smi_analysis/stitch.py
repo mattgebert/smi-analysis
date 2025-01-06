@@ -21,6 +21,7 @@ def stitching(datas, ais, masks, geometry ='Reflection', interp_factor = 2, flag
     :type resc_q: Boolean
     '''
 
+    # Perform an initial remeshing of the images to determine the q-range
     for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
         if geometry == 'Reflection':
             img, x, y = remesh.remesh_gi(data, ai, method='splitbbox', mask=mask)
@@ -37,16 +38,19 @@ def stitching(datas, ais, masks, geometry ='Reflection', interp_factor = 2, flag
             q_p_ini[:len(x), i] = x
             q_z_ini[:len(y), i] = y
 
-    nb_point = len(q_p_ini[:, 0])
-    for i in range(1, np.shape(q_p_ini)[1], 1):
-        y = np.argmin(abs(q_p_ini[:, i - 1] - np.min(q_p_ini[:, i])))
-        nb_point += len(q_p_ini[:, i]) - y
+    # Determine a useful number of points for the remeshing
+    nb_point = np.shape(q_p_ini)[0] #number of points
+    for i in range(1, np.shape(q_p_ini)[1], 1): #loop over the number of images
+        y = np.argmin(abs(q_p_ini[:, i - 1] - np.min(q_p_ini[:, i]))) # Find position where consecutive images overlap.
+        nb_point += len(q_p_ini[:, i]) - y # Increase the number of points by the number of points in the next image minus the overlap
 
+    # Increase the resmesh by a factor
     nb_point = nb_point * interp_factor
     qp_remesh = np.linspace(min(q_p_ini[:, 0]), max(q_p_ini[:, -1]), nb_point)
     qz_remesh = np.linspace(min(q_z_ini[:, 0]), max(q_z_ini[:, -1]), int(
         nb_point * abs(max(q_z_ini[:, -1]) - min(q_z_ini[:, 0])) / abs(max(q_p_ini[:, -1]) - min(q_p_ini[:, 0]))))
 
+    # Remesh the images
     for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
         qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
         qp_stop = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
