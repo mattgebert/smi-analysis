@@ -184,6 +184,7 @@ class SMI_geometry():
         if self.detector is None:
             self.define_detector()
 
+        # Reset the images and the masks
         self.imgs = []
         self.masks = []
         if len(lst_img) != len(self.bs):
@@ -298,10 +299,26 @@ class SMI_geometry():
             ai_temp.set_rot1(det_rot)
             self.ai.append(ai_temp)
 
-    def stitching_data(self, flag_scale=True, interp_factor=1, timing = False):
+    def stitching_data(self, flag_scale=True, interp_factor=1, perpendicular: bool = False, timing: bool = False):
+        """
+        Calculates the stitched image from the list of images and respective detector angles
+        
+        Parameters
+        ----------
+        flag_scale : bool, optional
+            Boolean to scale or not consecutive images at different detector positions, by default True
+        interp_factor : int, optional
+            Factor to increase the binning of the stitching image. Can help fixing some mask issues, by default 1
+        perpendicular : bool, optional
+            If the sample has been mounted perpendicular to axis of detector rotation, corrects GI geometry, by default False.        
+        timing : bool, optional
+            If True, prints the time taken to calculate the integrator and stitch the images, by default False
+        """
+        
         self.img_st, self.qp, self.qz = [], [], []
 
         init = datetime.datetime.now()
+            
         if self.ai == []:
             if len(self.det_angles) != len(self.imgs):
                 if self.detector != 'Pilatus900kw':
@@ -339,6 +356,37 @@ class SMI_geometry():
                 self.calculate_integrator_gi2(self.det_angles)
             else:
                 raise Exception('Unknown geometry: should be either Transmission or Reflection')
+            
+            if perpendicular:
+                # Reorder the images to reflect the perpendicular geometry
+                if self.imgs and self.masks:
+                    # Reverse the list order
+                    self.imgs.reverse()
+                    self.masks.reverse()
+                    # Flip the image and mask; stiching is now done in the vertical direction for images.
+                    for i in range(len(self.imgs)):
+                        self.imgs[i] = np.fliplr(np.rot90(self.imgs[i], 1))
+                        self.masks[i] = np.fliplr(np.rot90(self.masks[i], 1))
+                
+                # Correct the calculated integrators for perpendicular geometry; swap rot1 and rot2.
+                for ai_i in self.ai:
+                    ai_i.rot1, ai_i.rot2 = ai_i.rot2, ai_i.rot1
+                    # rot 1 should become 0.
+                
+                # Reorder the angles to match the reordered images
+                self.ai.reverse()
+                
+        else:
+            # Correct the image and masks for perpendicular geometry, without defining new integrators.
+            if perpendicular:
+                if self.imgs and self.masks:
+                    self.imgs.reverse()
+                    self.masks.reverse()
+                    for i in range(len(self.imgs)):
+                        self.imgs[i] = np.fliplr(np.rot90(self.imgs[i], 1))
+                        self.masks[i] = np.fliplr(np.rot90(self.masks[i], 1))
+                
+            
         fin = datetime.datetime.now()
         if timing:
             print('Time to calculate the integrator: %s' % (fin - init))
@@ -362,6 +410,7 @@ class SMI_geometry():
                 self.imgs[i] = self.imgs[i] / scale
         else:
             raise Exception('scaling waxs images error')
+        
 
     def inpainting(self, **kwargs):
         self.inpaints, self.mask_inpaints = integrate1D.inpaint_saxs(self.imgs,
