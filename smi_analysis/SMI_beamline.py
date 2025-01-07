@@ -357,7 +357,12 @@ class SMI_geometry():
             else:
                 raise Exception('Unknown geometry: should be either Transmission or Reflection')
             
+            fin = datetime.datetime.now()
+            if timing:
+                print('Time to calculate the integrator: %s' % (fin - init))
+            
             if perpendicular:
+                init = datetime.datetime.now()
                 # Reorder the images to reflect the perpendicular geometry
                 if self.imgs and self.masks:
                     # Reverse the list order
@@ -376,20 +381,24 @@ class SMI_geometry():
                 # Reorder the angles to match the reordered images
                 self.ai.reverse()
                 
+                fin = datetime.datetime.now()
+                if timing:
+                    print('Time to calc perpendicular geometry: %s' % (fin - init))
+                
         else:
             # Correct the image and masks for perpendicular geometry, without defining new integrators.
             if perpendicular:
+                init = datetime.datetime.now()
                 if self.imgs and self.masks:
                     self.imgs.reverse()
                     self.masks.reverse()
                     for i in range(len(self.imgs)):
                         self.imgs[i] = np.fliplr(np.rot90(self.imgs[i], 1))
                         self.masks[i] = np.fliplr(np.rot90(self.masks[i], 1))
-                
+                fin = datetime.datetime.now()
+                if timing:
+                    print('Time to calc perpendicular geometry: %s' % (fin - init))
             
-        fin = datetime.datetime.now()
-        if timing:
-            print('Time to calculate the integrator: %s' % (fin - init))
 
         init = datetime.datetime.now()
         self.img_st, self.mask_st, self.qp, self.qz, self.scales = stitch.stitching(self.imgs,
