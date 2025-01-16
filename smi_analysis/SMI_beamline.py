@@ -67,6 +67,9 @@ class SMI_geometry():
         self.bs: list[tuple[int, int]] = bs_pos
         self.detector: Literal['Pilatus900kw'] | Literal['Pilatus1m'] = detector
 
+        self._perpendicular_correction: bool = False
+        """Attribute to track if data has been corrected for perpendicular geometry in stiching_data method."""
+
         self.det_ini_angle = det_ini_angle
         self.det_angle_step = det_angle_step
         self.det_angles = det_angles
@@ -187,6 +190,7 @@ class SMI_geometry():
         # Reset the images and the masks
         self.imgs = []
         self.masks = []
+        self._perpendicular_correction = False
         if len(lst_img) != len(self.bs):
             self.bs = self.bs + [[0, 0]]*(len(lst_img) - len(self.bs))
 
@@ -361,7 +365,7 @@ class SMI_geometry():
             if timing:
                 print('Time to calculate the integrator: %s' % (fin - init))
             
-            if perpendicular:
+            if perpendicular and not self._perpendicular_correction:
                 init = datetime.datetime.now()
                 # Reorder the images to reflect the perpendicular geometry
                 if self.imgs and self.masks:
@@ -385,9 +389,12 @@ class SMI_geometry():
                 if timing:
                     print('Time to calc perpendicular geometry: %s' % (fin - init))
                 
+                # Set the perpendicular correction flag to True
+                self._perpendicular_correction = True      
+                
         else:
             # Correct the image and masks for perpendicular geometry, without defining new integrators.
-            if perpendicular:
+            if perpendicular and not self._perpendicular_correction:
                 init = datetime.datetime.now()
                 if self.imgs and self.masks:
                     self.imgs.reverse()
@@ -398,6 +405,9 @@ class SMI_geometry():
                 fin = datetime.datetime.now()
                 if timing:
                     print('Time to calc perpendicular geometry: %s' % (fin - init))
+                    
+                # Set the perpendicular correction flag to True
+                self._perpendicular_correction = True
             
 
         init = datetime.datetime.now()
