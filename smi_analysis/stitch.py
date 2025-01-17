@@ -74,12 +74,13 @@ def stitching(datas, ais, masks, geometry ='Reflection', interp_factor = 2, flag
 
         if i == 0:
             img_te = np.zeros((np.shape(qz_remesh)[0], np.shape(qp_remesh)[0]))
-            img_mask = np.zeros(np.shape(img_te))
+            img_mask = np.zeros(np.shape(img_te)).astype(bool)
 
             sca, sca1, sca2, sca3 = np.zeros(np.shape(img_te)), np.zeros(np.shape(img_te)), \
                                     np.zeros(np.shape(img_te)), np.zeros(np.shape(img_te))
             img_te[:, :np.shape(qimage)[1]] = qimage
-            img_mask[:, :np.shape(qmask)[1]] += np.logical_not(qmask).astype(int)
+            # img_mask[:, :np.shape(qmask)[1]] += np.logical_not(qmask).astype(int)
+            img_mask[:, :np.shape(qmask)[1]] |= qmask.astype(bool)
 
             sca[np.nonzero(qimage)] += 1
             sca2[np.nonzero(qimage)] += 1
@@ -100,7 +101,8 @@ def stitching(datas, ais, masks, geometry ='Reflection', interp_factor = 2, flag
             img1 = np.ma.masked_array(img_te, mask=sca1 != 2 * sca)
             img1 = np.ma.masked_where(img1 < threshold, img1)
             img_te[:, qp_start:qp_start + np.shape(qimage)[1]] += qimage
-            img_mask[:, qp_start:qp_start + np.shape(qimage)[1]] += ((qimage >= threshold).astype(int) * np.logical_not(qmask).astype(int))
+            # img_mask[:, qp_start:qp_start + np.shape(qimage)[1]] += ((qimage >= threshold).astype(int) * np.logical_not(qmask).astype(int))
+            img_mask[:, qp_start:qp_start + np.shape(qimage)[1]] |= qmask.astype(bool)
 
             img2 = np.ma.masked_array(img_te, mask=sca1 != 2 * sca)
             img2 = np.ma.masked_where(img2 < threshold, img2)
@@ -145,9 +147,11 @@ def stitching(datas, ais, masks, geometry ='Reflection', interp_factor = 2, flag
     img = img_te / sca2
 
     mask = (img_mask.astype(bool)).astype(int)
+    mask[np.where(img == 0)] = 1 # mask the pixels where the image is zero
 
     if geometry == 'Reflection':
         img = np.flipud(img)
+        mask = np.flipud(mask)
 
     qp = [qp_remesh.min(), qp_remesh.max()]
     qz = [-qz_remesh.max(), -qz_remesh.min()]
