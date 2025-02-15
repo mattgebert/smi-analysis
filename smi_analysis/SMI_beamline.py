@@ -137,22 +137,23 @@ class SMI_geometry():
         value : float
             Angle of incidence of the X-ray beam in degrees.
         """
-        return self._alphai
+        return -self._alphai
     
     @alphai.setter
     def alphai(self, value):
+        # Just like initialisation, sign swap the incoming angle of incidence
         v = -value
-        if self._alphai != v:
-            self._alphai = v
+        if self._alphai != v: # if it changes, save it.
+            self._alphai = v # save the negative.
             
             ## THIS WAS TOO SLOW. I COMMENTED IT OUT.
             # # Reset the azimuthal integrators, which depend on the incident angle
             # self.ai = []
-            
+
             # INSTEAD, UPDATE THE AI OBJECT PROPERTIES
             for ai in self.ai:
                 if self.geometry == 'Reflection' and isinstance(ai, Transform):
-                    ai.set_incident_angle(self._alphai)
+                    ai.set_incident_angle(self._alphai) # Push the negative.
 
     def define_detector(self):
         """
