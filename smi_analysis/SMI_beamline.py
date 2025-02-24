@@ -9,6 +9,7 @@ import copy
 import datetime
 from typing import Literal
 import numpy.typing as npt
+import warnings
 
 class SMI_geometry():
     """
@@ -27,7 +28,7 @@ class SMI_geometry():
     center : tuple[int|float, int|float]
         Coordinates of the beam centre at 0 degrees.
     bs_pos : list[tuple[int, int]]
-        The position of the center of the beam stop for each detector angle; [0,0] implies not measured.
+        The position of the center of the beam stop for each dselfetector angle; [0,0] implies not measured.
     detector : Literal['Pilatus900kw'] | Literal['Pilatus1m']
         Type of detector.
     det_ini_angle : float
@@ -72,7 +73,20 @@ class SMI_geometry():
 
         self.det_ini_angle = det_ini_angle
         self.det_angle_step = det_angle_step
-        self.det_angles = det_angles
+        self._cal_angles: list[float] = self.calibrate_waxs_angles(det_angles)
+        """The calibrated detector angles that will be measured
+        
+        The pilatus 1M detector images are split into three panels, each treated with a different angle.
+        """
+        self._det_angles: list[float] = det_angles
+        """
+        The user-entered detector angles that will be measured.
+        
+        See Also
+        --------
+        _cal_angles : list
+            The list of calibrated angles that will be used by the integrator.
+        """
 
         self.ai: list[azimuthalIntegrator.AzimuthalIntegrator | Transform] = []
         """Azimuthal integrator objects for each detector angle"""
@@ -154,6 +168,96 @@ class SMI_geometry():
             for ai in self.ai:
                 if self.geometry == 'Reflection' and isinstance(ai, Transform):
                     ai.set_incident_angle(self._alphai) # Push the negative.
+
+    PILATUS900KW_CORRECTION_GRADIENT: float = -0.3/20
+    """
+    The angular correction coefficient required to adjust a WAXS-arm angle of any magnitude.
+    """
+    
+    PILATUS900KW_CORRECTION_OFFSET: float = -0.06
+    """The correction required (in degrees) to adjust a WAXS-arm at zero degrees."""
+    
+    PILATUS900KW_PANEL_ANGLE: float = 7.47
+    """The PILATUS900KW detector panel angles (in degrees) for each image."""
+    
+    def calibrate_waxs_angles(self, angles: list[float]) -> list[float]:
+        """
+        Prepares angles for use in the SMI detector.
+
+        Adjusts angles for offsets found in the detector, and also converts
+        angles in degrees to radians.
+
+        If the detector is `Pilatus900kw` then additional angles for the side-panels of the detector are also calculated.
+
+        Returns
+        -------
+        list[float]
+            Corrections of input WAXS angles in radians.
+        """
+        calibrated_angles = np.asarray(angles) * (1 + self.PILATUS900KW_CORRECTION_GRADIENT) + self.PILATUS900KW_CORRECTION_OFFSET
+        if self.detector is None:
+            warnings.warn("The detector has not been defined. Corrected WAXS angles might be incorrect.")
+        elif self.detector == "Pilatus900kw":
+            # Split each detector angle into 3 for each subpanel.
+            new_angles = []
+            for angle in calibrated_angles:
+                new_angles.append(angle - self.PILATUS900KW_PANEL_ANGLE)
+                new_angles.append(angle)
+                new_angles.append(angle + self.PILATUS900KW_PANEL_ANGLE)
+            calibrated_angles = new_angles
+        # Convert to radians
+        radian_angles = np.deg2rad(calibrated_angles)
+        return radian_angles
+
+    @property
+    def det_angles(self) -> list[float]:
+        """
+        The user-defined angles of the detector to measure.
+        
+        Parameters
+        ----------
+        angles : list[float] | float
+            A new list of WAXS detector angles.
+        
+        Returns
+        -------
+        list[float]
+            The list of user-defined angle values.
+        
+        See Also
+        --------
+        SMI_geometry._cal_angles
+            The corrected angles.
+            
+        """
+        return self._det_angles
+    
+    @det_angles.setter
+    def det_angles(self, angles:list[float] | float):
+        if isinstance(angles, float):
+            angles = [angles]
+        # only update if the angles have changed.
+        if self._det_angles != angles:
+            self._det_angles = angles
+            
+            # Calculate the new angles
+            self._cal_angles = self.calibrate_waxs_angles(angles)
+            
+            # Update the azimuthal integrator objects
+            if len(self.ai) != 0:
+                if len(self.ai) == len(self._cal_angles):
+                    for i, (angle, ai) in zip(self._cal_angles, self.ai):
+                        if isinstance(ai, azimuthalIntegrator.AzimuthalIntegrator):
+                            ai.set_rot1(angle)
+                        elif isinstance(ai, Transform):
+                            ai.set_rot1(angle)
+                        else:
+                            warnings.warn(f"The integrator object `{ai}` cannot be updated for a new WAXS detector angle. Resetting all integrators.")
+                            self.ai = []
+                            break
+                else:
+                    # Reset the integrators so they will be re-calculated at next stitch.
+                    self.ai = []        
 
     def define_detector(self):
         """
@@ -325,40 +429,36 @@ class SMI_geometry():
         init = datetime.datetime.now()
             
         if self.ai == []:
-            if len(self.det_angles) != len(self.imgs):
+            if len(self._cal_angles) != len(self.imgs):
                 if self.detector != 'Pilatus900kw':
-                    if len(self.det_angles) !=0 and len(self.det_angles) > len(self.imgs):
+                    if len(self._cal_angles) !=0 and len(self._cal_angles) > len(self.imgs):
                         raise Exception('The number of angle for the %s is not good. '
                                         'There is %s images but %s angles' % (self.detector,
                                                                               int(len(self.imgs)),
-                                                                              len(self.det_angles)))
+                                                                              len(self._cal_angles)))
 
                     self.det_angles = [self.det_ini_angle + i * self.det_angle_step
                                        for i in range(0, len(self.imgs), 1)]
 
                 else:
                     if len(self.det_angles) == 0:
+                        # Setting the det angles also propogates to calibrated angles.
                         self.det_angles = [self.det_ini_angle + i * self.det_angle_step
                                            for i in range(0, int(len(self.imgs)//3), 1)]
 
-                    if 3*len(self.det_angles) != len(self.imgs):
+                    if 3 * len(self._cal_angles) != len(self.imgs):
                         raise Exception('The number of angle for the %s is not good. '
                                         'There is %s images but %s angles' % (self.detector,
                                                                               int(len(self.imgs)//3),
-                                                                              len(self.det_angles)))
-
-                    angles = []
-                    for angle in self.det_angles:
-                        angles = angles + [angle - np.deg2rad(7.47), angle, angle + np.deg2rad(7.47)]
-                    self.det_angles = angles
+                                                                              len(self._cal_angles)))
 
             # Calculate the self.ai values.
             if self.geometry == 'Transmission':
-                self.calculate_integrator_trans(self.det_angles)
+                self.calculate_integrator_trans(self._cal_angles)
             elif self.geometry == 'Reflection':
-                self.calculate_integrator_gi(self.det_angles)
+                self.calculate_integrator_gi(self._cal_angles)
             elif self.geometry == 'Reflection_test':
-                self.calculate_integrator_gi2(self.det_angles)
+                self.calculate_integrator_gi2(self._cal_angles)
             else:
                 raise Exception('Unknown geometry: should be either Transmission or Reflection')
             
