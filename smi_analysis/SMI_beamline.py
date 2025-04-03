@@ -237,7 +237,7 @@ class SMI_geometry():
         if isinstance(angles, float):
             angles = [angles]
         # only update if the angles have changed.
-        if self._det_angles != angles:
+        if np.any(self._det_angles != angles):
             self._det_angles = angles
             
             # Calculate the new angles
