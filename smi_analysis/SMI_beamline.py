@@ -63,6 +63,8 @@ class SMI_geometry():
             self.det = Detector.Pilatus1M_SMI()
         elif self.detector == 'Pilatus900kw':
             self.det = Detector.VerticalPilatus900kw()
+        elif self.detector == 'Pilatus2m':
+            self.det = Detector.Pilatus2M_SMI()
         elif self.detector == 'Pilatus300kw':
             self.det = Detector.VerticalPilatus300kw()
         elif self.detector == 'rayonix':
@@ -74,7 +76,7 @@ class SMI_geometry():
         elif self.detector == 'Pilatus800k_CMS':
             self.det = Detector.Pilatus800k_CMS()
         else:
-            raise Exception('Unknown detector for SMI. Should be either: Pilatus1m or Pilatus300kw or Pilatus900kw or rayonix')
+            raise Exception('Unknown detector for SMI. Should be either: Pilatus2m or Pilatus1m or Pilatus300kw or Pilatus900kw or rayonix')
 
     def open_data(self, path, lst_img, optional_mask=None):
         """
@@ -102,7 +104,7 @@ class SMI_geometry():
                 else:
                     self.masks.append(self.det.calc_mask(bs=bs, bs_kind=self.bs_kind, optional_mask=optional_mask))
 
-            if self.detector == 'Pilatus1m':
+            if self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m':
                 self.imgs.append(fabio.open(os.path.join(path, img)).data)
             elif self.detector == 'Pilatus900kw':
                 # self.imgs.append(np.rot90(fabio.open(os.path.join(path, img)).data, 1))
@@ -142,7 +144,7 @@ class SMI_geometry():
             if self.detector != 'rayonix':
                 self.masks.append(self.det.calc_mask(bs=bs, bs_kind=self.bs_kind, optional_mask=optional_mask))
 
-            if self.detector == 'Pilatus1m':
+            if self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m':
                 self.imgs.append(img)
             elif self.detector == 'Pilatus900kw':
                 self.imgs.append(np.rot90(img, 1))
@@ -307,9 +309,9 @@ class SMI_geometry():
             if azimuth_range is None and (self.detector == 'Pilatus300kw' or self.detector == 'Pilatus900kw'):
                 azimuth_range = (0, 90)
 
-            if radial_range is None and self.detector == 'Pilatus1m':
+            if radial_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m'):
                 radial_range = (0.0001, np.sqrt(self.qp[1]**2 + self.qz[1]**2))
-            if azimuth_range is None and self.detector == 'Pilatus1m':
+            if azimuth_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m'):
                 azimuth_range = (-180, 180)
 
             self.q_rad, self.I_rad = integrate1D.integrate_rad_saxs(self.inpaints,
@@ -350,9 +352,9 @@ class SMI_geometry():
         if azimuth_range is None and (self.detector == 'Pilatus300kw' or self.detector == 'Pilatus900kw'):
             azimuth_range = (1, 90)
 
-        if radial_range is None and self.detector == 'Pilatus1m':
+        if radial_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m'):
             radial_range = (0.001, np.sqrt(self.qp[1] ** 2 + self.qz[1] ** 2))
-        if azimuth_range is None and self.detector == 'Pilatus1m':
+        if azimuth_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m'):
             azimuth_range = (-180, 180)
 
         if np.array_equal(self.cake, []):
