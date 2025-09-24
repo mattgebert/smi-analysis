@@ -142,12 +142,20 @@ class SMI_geometry():
         self.imgs = []
         for img, bs in zip(lst_img, self.bs):
             if self.detector != 'rayonix':
-                self.masks.append(self.det.calc_mask(bs=bs, bs_kind=self.bs_kind, optional_mask=optional_mask))
+                if self.detector == 'Pilatus900kw':
+                    masks = self.det.calc_mask(bs=bs, bs_kind=self.bs_kind, optional_mask=optional_mask)
+                    self.masks.append(masks[:, :195])
+                    self.masks.append(masks[:, 212:212 + 195])
+                    self.masks.append(masks[:, -195:])
+                else:
+                    self.masks.append(self.det.calc_mask(bs=bs, bs_kind=self.bs_kind, optional_mask=optional_mask))
 
             if self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m':
                 self.imgs.append(img)
             elif self.detector == 'Pilatus900kw':
-                self.imgs.append(np.rot90(img, 1))
+                self.imgs.append(np.rot90(img, 1)[:, :195])
+                self.imgs.append(np.rot90(img, 1)[:, 212:212 + 195])
+                self.imgs.append(np.rot90(img, 1)[:, -195:])
             elif self.detector == 'Pilatus300kw':
                 self.imgs.append(np.rot90(img, 1))
             elif self.detector == 'rayonix':
