@@ -126,7 +126,7 @@ def SMI_analysis_input(analysis_neededinfo):
         # If pil300kW record, the waxs position will also be recorded so just initialize to 0
         det_ini_angle_waxs = np.deg2rad(0)
         det_angular_step_waxs = np.deg2rad(0)
-        SMI_waxs = SMI_beamline.SMI_geometry(geometry=geometry,
+        SMI_waxs = SMI_beamline.SMI_ExperimentConfig(geometry=geometry,
                                              detector=detector_waxs,
                                              sdd=sdd_waxs,
                                              wav=wav,
@@ -147,7 +147,7 @@ def SMI_analysis_input(analysis_neededinfo):
                         analysis_neededinfo.get('pil1m_bs_y')]]
         det_ini_angle_saxs = np.deg2rad(0)
         det_angular_step_saxs = np.deg2rad(0)
-        SMI_saxs = SMI_beamline.SMI_geometry(geometry=geometry,
+        SMI_saxs = SMI_beamline.SMI_ExperimentConfig(geometry=geometry,
                                              detector=detector_saxs,
                                              sdd=sdd_saxs,
                                              wav=wav,

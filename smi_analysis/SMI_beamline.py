@@ -1,17 +1,38 @@
+"""
+The standard entry point for the SMI beamline analysis package.
+
+This module contains the SMI_geometry class, which is used to handle 
+all calculations of the SMI beamline, including loading data,
+stitching images, and performing azimuthal and radial integrations.
+
+This library depends heavily on the pyFAI library for azimuthal integration
+and detector definitions, and on the smi_analysis.detectors module for
+handling detector-specific operations.
+"""
+# Standard library imports
 import enum
-from pyFAI import azimuthalIntegrator
-from pygix import Transform
-from smi_analysis import Detector, stitch, integrate1D
 import os
-import fabio
-import numpy as np
 import copy
 import datetime
-from typing import Literal
-import numpy.typing as npt
 import warnings
+from typing import Literal
 
-class SMI_geometry():
+# External imports
+import numpy as np, numpy.typing as npt
+import fabio
+
+# pyFAI imports
+from pyFAI.integrator.azimuthal import AzimuthalIntegrator
+from pyFAI.integrator.fiber import FiberIntegrator
+from pyFAI.multi_geometry import MultiGeometry, MultiGeometryFiber
+from pyFAI.detectors import Detector
+
+# SMI imports
+from smi_analysis.equipement.detectors import SMI_DetectorType
+from smi_analysis.equipement.modes import MeasurementMode, MeasurementModeType
+from smi_analysis import stitch, integrate1D 
+
+class SMI_ExperimentConfig():
     """
     The SMI_geometry class is a class that contains all the information about the geometry of the beamline.
     
@@ -19,7 +40,7 @@ class SMI_geometry():
     
     Parameters
     ----------
-    geometry : Literal['Transmission'] | Literal['Reflection']
+    geometry : MeasurementModeType
         The measurement geometry.
     sdd : float
         Sample to detector distance in millimeters.
@@ -36,7 +57,8 @@ class SMI_geometry():
     det_angle_step : float
         The step between each detector angle.
     det_angles : list[int | float] | npt.NDArray[np.float64 | np.int_]
-        The angles of the detector in radians.
+        The angles of the detector in radians (uncalibrated). 
+        See `SMI_geometry.calibrate_waxs_angles` for the calibrated angles that will be used.
     alphai : float
         The angle of incidence of the X-ray beam in degrees.
     bs_kind : Literal["pindiode"] | Literal['rod'] | None
@@ -44,40 +66,49 @@ class SMI_geometry():
     """
     
     def __init__(self,
-                 geometry: Literal['Transmission'] | Literal['Reflection'],
+                 geometry: MeasurementModeType,
                  sdd: float,
                  wav: float,
                  center: tuple[int|float, int|float],
                  bs_pos: list[tuple[int, int]],
-                 detector: Literal['Pilatus900kw'] | Literal['Pilatus1m'] = 'Pilatus900kw',
-                 det_ini_angle: float=0,
-                 det_angle_step: float=0,
-                 det_angles: list[int | float] | npt.NDArray[np.float64 | np.int_]=[],
-                 alphai=0,
+                 detector: SMI_DetectorType = SMI_DetectorType.PILATUS900K,
+                 det_ini_angle: float = 0.0,
+                 det_angle_step: float = 0.0,
+                 det_angles: list[int | float] = [],
+                 grazing_angle: float = 0.0,
                  bs_kind=None):
+        if isinstance(geometry, str):
+            geometry = MeasurementMode(geometry)
 
-        self.geometry: Literal['Transmission'] | Literal['Reflection'] = geometry
+        self.geometry: MeasurementMode = geometry
         """The measurement geometry."""
         self.sdd: float = sdd
         """Sample to detector distance in millimeters."""
         self._wav: float = wav
         """The wavelength of the X-ray beam in meters."""
-        self._alphai: float = -alphai
+        self._alphai: float = -grazing_angle
         """The angle of incidence of the X-ray beam in degrees."""
         self.center: tuple[int|float, int|float] = center
         self.bs: list[tuple[int, int]] = bs_pos
-        self.detector: Literal['Pilatus900kw'] | Literal['Pilatus1m'] = detector
+        self.detector: SMI_DetectorType = detector
 
         self._perpendicular_correction: bool = False
         """Attribute to track if data has been corrected for perpendicular geometry in stiching_data method."""
 
         self.det_ini_angle = det_ini_angle
         self.det_angle_step = det_angle_step
-        self._cal_angles: list[float] = self.calibrate_waxs_angles(det_angles)
-        """The calibrated detector angles that will be measured
+        self._cal_angles: npt.NDArray[np.float64] = self.calibrate_waxs_angles(det_angles)
+        """The calibrated detector angles that will be measured.
         
-        The pilatus 1M detector images are split into three panels, each treated with a different angle.
+        The pilatus 1M detector images are split into three panels due to angled panels
+        and so each treated with a different angle.
+        
+        See Also
+        --------
+        det_angles : list
+            The user-entered angles that will be calibrated.
         """
+        
         self._det_angles: list[float] = det_angles
         """
         The user-entered detector angles that will be measured.
@@ -88,8 +119,16 @@ class SMI_geometry():
             The list of calibrated angles that will be used by the integrator.
         """
 
-        self.ai: list[azimuthalIntegrator.AzimuthalIntegrator | Transform] = []
-        """Azimuthal integrator objects for each detector angle"""
+        self.integrators: list[AzimuthalIntegrator | FiberIntegrator] = []
+        """Azimuthal or Grazing integrator objects for each detector angle"""
+        
+        self.multi_geometry : MultiGeometryFiber | MultiGeometry | None = None
+        """
+        The pyFAI multi-geometry object used to integrate multiple detector angles / images.
+        
+        Consists of the (multiple) `self.integrators` objects.
+        """
+        
         self.masks = []
         self.cake = []
         self.inpaints, self.mask_inpaints = [], []
@@ -132,7 +171,7 @@ class SMI_geometry():
             # self.ai = []
             
             # INSTEAD, UPDATE THE AI OBJECT PROPERTIES
-            for ai in self.ai:
+            for ai in self.integrators:
                 ai.set_wavelength(value) # From pyFai.geometry.core.Geometry
             
     @property
@@ -165,22 +204,12 @@ class SMI_geometry():
             # self.ai = []
 
             # INSTEAD, UPDATE THE AI OBJECT PROPERTIES
-            for ai in self.ai:
+            for ai in self.integrators:
                 if self.geometry == 'Reflection' and isinstance(ai, Transform):
                     ai.set_incident_angle(self._alphai) # Push the negative.
 
-    PILATUS900KW_CORRECTION_GRADIENT: float = -0.3/20
-    """
-    The angular correction coefficient required to adjust a WAXS-arm angle of any magnitude.
-    """
-    
-    PILATUS900KW_CORRECTION_OFFSET: float = -0.06
-    """The correction required (in degrees) to adjust a WAXS-arm at zero degrees."""
-    
-    PILATUS900KW_PANEL_ANGLE: float = 7.47
-    """The PILATUS900KW detector panel angles (in degrees) for each image."""
-    
-    def calibrate_waxs_angles(self, angles: list[float]) -> list[float]:
+
+    def calibrate_waxs_angles(self, angles: npt.ArrayLike) -> npt.NDArray[np.float64]:
         """
         Prepares angles for use in the SMI detector.
 
@@ -194,7 +223,7 @@ class SMI_geometry():
         list[float]
             Corrections of input WAXS angles in radians.
         """
-        calibrated_angles = np.asarray(angles) * (1 + self.PILATUS900KW_CORRECTION_GRADIENT) + self.PILATUS900KW_CORRECTION_OFFSET
+        calibrated_angles = np.asarray(angles, dtype=np.float64) * (1 + self.PILATUS900KW_CORRECTION_GRADIENT) + self.PILATUS900KW_CORRECTION_OFFSET
         if self.detector is None:
             warnings.warn("The detector has not been defined. Corrected WAXS angles might be incorrect.")
         elif self.detector == "Pilatus900kw":
@@ -244,20 +273,20 @@ class SMI_geometry():
             self._cal_angles = self.calibrate_waxs_angles(angles)
             
             # Update the azimuthal integrator objects
-            if len(self.ai) != 0:
-                if len(self.ai) == len(self._cal_angles):
-                    for i, (angle, ai) in zip(self._cal_angles, self.ai):
+            if len(self.integrators) != 0:
+                if len(self.integrators) == len(self._cal_angles):
+                    for i, (angle, ai) in zip(self._cal_angles, self.integrators):
                         if isinstance(ai, azimuthalIntegrator.AzimuthalIntegrator):
                             ai.set_rot1(angle)
                         elif isinstance(ai, Transform):
                             ai.set_rot1(angle)
                         else:
                             warnings.warn(f"The integrator object `{ai}` cannot be updated for a new WAXS detector angle. Resetting all integrators.")
-                            self.ai = []
+                            self.integrators = []
                             break
                 else:
                     # Reset the integrators so they will be re-calculated at next stitch.
-                    self.ai = []        
+                    self.integrators = []        
 
     def define_detector(self):
         """
@@ -376,7 +405,7 @@ class SMI_geometry():
                 self.imgs.append(img)
 
     def calculate_integrator_trans(self, det_rots):
-        self.ai = []
+        self.integrators = []
         ai = azimuthalIntegrator.AzimuthalIntegrator(**{'detector': self.det,
                                                         'rot1': 0,
                                                         'rot2': 0,
@@ -389,7 +418,7 @@ class SMI_geometry():
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
             ai_temp.set_rot1(det_rot)
-            self.ai.append(ai_temp)
+            self.integrators.append(ai_temp)
 
     def calculate_integrator_gi(self, det_rots):
         ai = Transform(wavelength=self.wav, detector=self.det, incident_angle=self.alphai)
@@ -400,10 +429,10 @@ class SMI_geometry():
             ai_temp = copy.deepcopy(ai)
             ai_temp.set_rot1(det_rot)
             ai_temp.set_incident_angle(self.alphai)
-            self.ai.append(ai_temp)
+            self.integrators.append(ai_temp)
 
     def calculate_integrator_gi2(self, det_rots):
-        self.ai = []
+        self.integrators = []
         ai = azimuthalIntegrator.AzimuthalIntegrator(**{'detector': self.det,
                                                         'rot1': 0,
                                                         'rot2': 0,
@@ -416,7 +445,7 @@ class SMI_geometry():
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
             ai_temp.set_rot1(det_rot)
-            self.ai.append(ai_temp)
+            self.integrators.append(ai_temp)
 
     def stitching_data(self, flag_scale=True, interp_factor=1, perpendicular: bool = False, timing: bool = False):
         """
@@ -438,7 +467,7 @@ class SMI_geometry():
 
         init = datetime.datetime.now()
             
-        if self.ai == []:
+        if self.integrators == []:
             if len(self._cal_angles) != len(self.imgs):
                 if self.detector != 'Pilatus900kw':
                     if len(self._cal_angles) !=0 and len(self._cal_angles) > len(self.imgs):
@@ -489,12 +518,12 @@ class SMI_geometry():
                         self.masks[i] = np.fliplr(np.rot90(self.masks[i], 1))
                 
                 # Correct the calculated integrators for perpendicular geometry; swap rot1 and rot2.
-                for ai_i in self.ai:
+                for ai_i in self.integrators:
                     ai_i.rot1, ai_i.rot2 = ai_i.rot2, ai_i.rot1
                     # rot 1 should become 0.
                 
                 # Reorder the angles to match the reordered images
-                self.ai.reverse()
+                self.integrators.reverse()
                 
                 fin = datetime.datetime.now()
                 if timing:
@@ -523,7 +552,7 @@ class SMI_geometry():
 
         init = datetime.datetime.now()
         self.img_st, self.mask_st, self.qp, self.qz, self.scales = stitch.stitching(self.imgs,
-                                                                                    self.ai,
+                                                                                    self.integrators,
                                                                                     self.masks,
                                                                                     self.geometry,
                                                                                     flag_scale=flag_scale,
@@ -544,7 +573,7 @@ class SMI_geometry():
 
     def inpainting(self, **kwargs):
         self.inpaints, self.mask_inpaints = integrate1D.inpaint_saxs(self.imgs,
-                                                                     self.ai,
+                                                                     self.integrators,
                                                                      self.masks,
                                                                      **kwargs
                                                                      )
@@ -562,7 +591,7 @@ class SMI_geometry():
             if np.array_equal(self.inpaints, []):
                 self.inpainting()
             self.cake, self.q_cake, self.chi_cake = integrate1D.cake_saxs(self.inpaints,
-                                                                          self.ai,
+                                                                          self.integrators,
                                                                           self.mask_inpaints,
                                                                           radial_range=radial_range,
                                                                           azimuth_range=azimuth_range,
@@ -600,7 +629,7 @@ class SMI_geometry():
                 azimuth_range = (-180, 180)
 
             self.q_rad, self.I_rad, self.I_rad_err = integrate1D.integrate_rad_saxs(self.inpaints,
-                                                                    self.ai,
+                                                                    self.integrators,
                                                                     self.masks,
                                                                     radial_range=radial_range,
                                                                     azimuth_range=azimuth_range,

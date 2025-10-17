@@ -4,7 +4,8 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from smi_analysis import SMI_beamline, stitch, Detector
+from smi_analysis import SMI_beamline, stitch
+from smi_analysis.detectors import Detector
 
 if __name__ == '__main__':
 
@@ -20,7 +21,7 @@ if __name__ == '__main__':
         # detector_waxs = 'Pilatus900kw'
 
 
-        SMI_waxs = SMI_beamline.SMI_geometry(geometry=geometry,
+        SMI_waxs = SMI_beamline.SMI_ExperimentConfig(geometry=geometry,
                                              sdd=sdd_waxs, wav=wav, alphai=alphai, center=center_waxs,
                                              bs_pos=bs_pos_waxs, detector=detector_waxs,
                                              det_ini_angle=det_ini_angle, det_angle_step=det_angle_step)
@@ -120,7 +121,7 @@ if __name__ == '__main__':
         all_dat = []
         path = 'C:\\Users\\gfreychet\\Desktop\\'
 
-        SMI = SMI_beamline.SMI_geometry(geometry=geometry,
+        SMI = SMI_beamline.SMI_ExperimentConfig(geometry=geometry,
                                         sdd=sdd,
                                         wav=wav,
                                         alphai=alphai,
@@ -188,7 +189,7 @@ if __name__ == '__main__':
 
         print(all_da[0])
 
-        SMI = SMI_beamline.SMI_geometry(geometry=geometry,
+        SMI = SMI_beamline.SMI_ExperimentConfig(geometry=geometry,
                                         sdd=sdd,
                                         wav=wav,
                                         alphai=alphai,
@@ -320,7 +321,7 @@ if __name__ == '__main__':
             for da in dat:
                 waxs_angle = waxs_angle + [np.deg2rad(float(da[idx2+3:idx3]))]
 
-            SMI_waxs = SMI_beamline.SMI_geometry(geometry='Transmission',
+            SMI_waxs = SMI_beamline.SMI_ExperimentConfig(geometry='Transmission',
                                                  detector='Pilatus900kw',
                                                  sdd=sdd_waxs,
                                                  wav=wav,
@@ -396,7 +397,7 @@ if __name__ == '__main__':
         wav = 1E-10 * (12.39842/ener)
         center = [384, 558] # change from 451
         bs_pos = [[378, 449]]
-        OPL_waxs = SMI_beamline.SMI_geometry(geometry = 'Reflection', sdd = 1500, wav = wav,
+        OPL_waxs = SMI_beamline.SMI_ExperimentConfig(geometry = 'Reflection', sdd = 1500, wav = wav,
                                              alphai = np.deg2rad(0.11), center = center, bs_pos = bs_pos,
                                              detector = 'Pilatus300k_OPLS', det_ini_angle = 0, det_angle_step = 0)
 
@@ -490,7 +491,7 @@ if __name__ == '__main__':
             for k, da in enumerate(dat):
                 for i in [0, 1, 2]:
                     print(da)
-                    SMI_waxs = SMI_beamline.SMI_geometry(geometry=geometry,
+                    SMI_waxs = SMI_beamline.SMI_ExperimentConfig(geometry=geometry,
                                                          detector='Pilatus900kw',
                                                          sdd=sdd_waxs,
                                                          wav=wav,
@@ -561,7 +562,7 @@ if __name__ == '__main__':
                     all_da[i] = all_da[i] + [file]
 
         for da in [all_da[0]]:
-            SMI = SMI_beamline.SMI_geometry(geometry=geometry,
+            SMI = SMI_beamline.SMI_ExperimentConfig(geometry=geometry,
                                             sdd=sdd,
                                             wav=wav,
                                             alphai=alphai,
@@ -637,7 +638,7 @@ if __name__ == '__main__':
         for waxs_pos in [6.4]:
             for dat in all_da:
                 if len(dat)!=0:
-                    SMI = SMI_beamline.SMI_geometry(geometry=geometry,
+                    SMI = SMI_beamline.SMI_ExperimentConfig(geometry=geometry,
                                                     sdd=272,
                                                     wav=wav,
                                                     alphai=alphai,
@@ -733,7 +734,7 @@ if __name__ == '__main__':
                 energy = 0.001 * float(da[0][idx - 7:idx])
                 wav = 1E-10 * (12.39842/energy)
 
-                SMI = SMI_beamline.SMI_geometry(geometry=geometry,
+                SMI = SMI_beamline.SMI_ExperimentConfig(geometry=geometry,
                                                 sdd=sdd,
                                                 wav=wav,
                                                 alphai=alphai,
@@ -774,7 +775,7 @@ if __name__ == '__main__':
         geometry, sdd, wav, alphai, center, bs_pos, detector = 'Transmission', 273.9, 1E-10 * (12.39842/18.2), np.deg2rad(0.0), [96., 1475-88], [[11, 1268]], 'Pilatus300kw'
         det_ini_angle, det_angle_step = np.deg2rad(2.95), np.deg2rad(6.)
 
-        SMI = SMI_beamline.SMI_geometry(geometry=geometry,
+        SMI = SMI_beamline.SMI_ExperimentConfig(geometry=geometry,
                                         sdd=sdd,
                                         wav=wav,
                                         alphai=alphai,
