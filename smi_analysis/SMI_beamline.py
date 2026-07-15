@@ -133,7 +133,13 @@ class SMI_geometry():
             
             # INSTEAD, UPDATE THE AI OBJECT PROPERTIES
             for ai in self.ai:
-                ai.set_wavelength(value) # From pyFai.geometry.core.Geometry
+                if (hasattr(ai, 'wavelength')
+                    and hasattr(ai.__class__, 'wavelength')
+                    and isinstance(ai.__class__.wavelength, property)):
+                    ai.wavelength = value # From pyFai.geometry.core.Geometry
+                else:
+                    # Deprecated. 
+                    ai.set_wavelength(value) # From pyFai.geometry.core.Geometry
             
     @property
     def alphai(self):
@@ -384,11 +390,23 @@ class SMI_geometry():
                                                      )
 
         ai.setFit2D(self.sdd, self.center[0], self.center[1])
-        ai.set_wavelength(self.wav)
+        
+        if (hasattr(ai, 'wavelength')
+            and hasattr(ai.__class__, 'wavelength')
+            and isinstance(ai.__class__.wavelength, property)):
+            ai.wavelength = self.wav # From pyFai.geometry.core.Geometry
+        else:
+            # Deprecated. 
+            ai.set_wavelength(self.wav) # From pyFai.geometry.core.Geometry
 
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
-            ai_temp.set_rot1(det_rot)
+            if (hasattr(ai_temp, 'rot1')
+                and hasattr(ai_temp.__class__, 'rot1')
+                and isinstance(ai_temp.__class__.rot1, property)):
+                ai_temp.rot1 = det_rot
+            else:
+                ai_temp.set_rot1(det_rot)
             self.ai.append(ai_temp)
 
     def calculate_integrator_gi(self, det_rots):
@@ -398,7 +416,12 @@ class SMI_geometry():
 
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
-            ai_temp.set_rot1(det_rot)
+            if (hasattr(ai_temp, 'rot1')
+                and hasattr(ai_temp.__class__, 'rot1')
+                and isinstance(ai_temp.__class__.rot1, property)):
+                ai_temp.rot1 = det_rot
+            else:
+                ai_temp.set_rot1(det_rot)
             ai_temp.set_incident_angle(self.alphai)
             self.ai.append(ai_temp)
 
@@ -411,11 +434,23 @@ class SMI_geometry():
                                                      )
 
         ai.setFit2D(self.sdd, self.center[0], self.center[1])
-        ai.set_wavelength(self.wav)
+        
+        if (hasattr(ai, 'wavelength')
+            and hasattr(ai.__class__, 'wavelength')
+            and isinstance(ai.__class__.wavelength, property)):
+            ai.wavelength = self.wav # From pyFai.geometry.core.Geometry
+        else:
+            # Deprecated. 
+            ai.set_wavelength(self.wav) # From pyFai.geometry.core.Geometry
 
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
-            ai_temp.set_rot1(det_rot)
+            if (hasattr(ai_temp, 'rot1')
+                and hasattr(ai_temp.__class__, 'rot1')
+                and isinstance(ai_temp.__class__.rot1, property)):
+                ai_temp.rot1 = det_rot
+            else:
+                ai_temp.set_rot1(det_rot)
             self.ai.append(ai_temp)
 
     def stitching_data(self, flag_scale=True, interp_factor=1, perpendicular: bool = False, timing: bool = False):
